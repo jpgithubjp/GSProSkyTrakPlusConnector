@@ -10,9 +10,7 @@ namespace SkytrakOpenAPI
 {
     public class GSPApi
     {
-        //private BackgroundQueue _GSPSendQueue = new();
         private const int _OpenAPIPort = 921;
-        //[Nullable(2)]
         private Socket _GSPSocket;
         private byte[] _GSPReadBuffer = new byte[1024];
         private string _GSPResponse = "";
