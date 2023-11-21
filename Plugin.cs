@@ -1,37 +1,41 @@
-﻿using System;
-using System.Reflection;
-using System.Threading;
-using BepInEx;
+﻿using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
 using Newtonsoft.Json;
-using Security;
-using SkyTrakWrapper;
+using System;
+using System.Reflection;
+using System.Threading;
 using UnityEngine;
 
-namespace SkytakOpenAPI
+namespace SkytrakOpenAPI
 {
-    [BepInPlugin("SkytrakOpenApi_b5", "SkytrakOpenApi_b5", "1.0.0")]
+    [BepInPlugin("GSProSkyTrakPlusConnector", "GSProSkyTrakPlusConnector", "0.1.0")]
     public class Plugin : BaseUnityPlugin
     {
+        public static GSPApi api = new();
+        internal static ManualLogSource Log;
+
         public void Awake()
         {
             Plugin.Log = base.Logger;
-            base.Logger.LogInfo("Plugin SkytrakOpenApi_b5 is loaded!");
-            Harmony harmony = new Harmony("com.skytrak.openapi");
-            MethodBase methodBase = AccessTools.Method(typeof(CBallFlightManager), "CalculateFlightTrajectory", new Type[]
-            {
+            Log.LogInfo("Plugin GSProSkyTrakPlusConnector is loaded!");
+
+            Harmony harmony = new("com.skytrak.openapi");
+            MethodBase calculateFlightTrajectory = AccessTools.Method(typeof(CBallFlightManager), "CalculateFlightTrajectory",
+            [
                 typeof(Vector3),
                 typeof(double),
                 typeof(double),
                 typeof(double),
                 typeof(double),
                 typeof(double)
-            }, null);
-            MethodInfo methodInfo = AccessTools.Method(typeof(Plugin.Patch), "Postfix0", null, null);
-            base.Logger.LogInfo("Applying Patch");
-            harmony.Patch(methodBase, null, new HarmonyMethod(methodInfo), null, null, null);
-            base.Logger.LogInfo("Plugin Patched");
+            ], null);
+            MethodInfo postFixPatch_CalculateFlightTrajectory = AccessTools.Method(typeof(Plugin.Patch), "PostFix_CalculateFlightTrajectory", null, null);
+
+            Log.LogInfo("Applying Patch");
+            harmony.Patch(calculateFlightTrajectory, null, new HarmonyMethod(postFixPatch_CalculateFlightTrajectory), null, null, null);
+            Log.LogInfo("Plugin Patched");
+
             Plugin.StartSocketConnectThread();
         }
 
@@ -41,57 +45,59 @@ namespace SkytakOpenAPI
             new Thread(new ThreadStart(Plugin.api.ConnectToGSP)).Start();
         }
 
-        public static GSPApi api = new GSPApi();
-        internal static ManualLogSource Log;
-        public static EONIOHDNGND sTWrapper0;
-        public static AOMKMFBGCGG sTWrapper1;
-        public static bool puttingMode;
-
         [HarmonyPatch]
         public class Patch
         {
+            private const double RADIANS_TO_DEGREES = 57.29577951308232;
+
             [HarmonyPostfix]
             [HarmonyPatch(typeof(CBallFlightManager), "CalculateFlightTrajectory")]
-            public static void Postfix0(object[] __args)
+            public static void PostFix_CalculateFlightTrajectory(object[] __args)
             {
-                Plugin.Log.LogInfo("Got a normal shot!");
-                double num = (double)__args[1];
-                double num2 = (double)__args[2];
-                double num3 = (double)__args[5];
-                double num4 = (double)__args[3];
-                double num5 = (double)__args[4] * -1.0;
-                double num6 = Math.Abs(Math.Sqrt(Math.Pow((double)__args[3], 2.0) + Math.Pow((double)__args[4], 2.0)));
-                double num7 = Math.Asin(num5 / num6) * 57.29577951308232;
-                Plugin.Log.LogInfo("BallSpeedMPH: " + num.ToString());
-                Plugin.Log.LogInfo("VLA: " + num2.ToString());
-                Plugin.Log.LogInfo("HLA: " + num3.ToString());
-                Plugin.Log.LogInfo("BackSpin: " + num4.ToString());
-                Plugin.Log.LogInfo("SideSpin: " + num5.ToString());
-                Plugin.Log.LogInfo("TotalSpin: " + num6.ToString());
-                Plugin.Log.LogInfo("SpinAxisDeg: " + num7.ToString());
-                GSPShotData gspshotData = new GSPShotData();
-                gspshotData.DeviceID = "OpenApi";
-                gspshotData.Units = "Yards";
-                gspshotData.APIversion = "1";
-                gspshotData.BallData = new GSPBallData
+                Plugin.Log.LogInfo("Got a shot from SkyTrak+!");
+
+                double ballSpeedMPH = (double)__args[1];
+                double verticalLaunchAngle = (double)__args[2];
+                double horizontalLaunchAngle = (double)__args[5];
+                double backSpin = (double)__args[3];
+                double sideSpin = (double)__args[4] * -1.0;
+                double totalSpin = Math.Abs(Math.Sqrt(Math.Pow(backSpin, 2.0) + Math.Pow(sideSpin, 2.0)));
+                double spinAxisDegrees = Math.Asin(sideSpin / totalSpin) * RADIANS_TO_DEGREES;
+
+                Plugin.Log.LogInfo("BallSpeedMPH: " + ballSpeedMPH.ToString());
+                Plugin.Log.LogInfo("VLA: " + verticalLaunchAngle.ToString());
+                Plugin.Log.LogInfo("HLA: " + horizontalLaunchAngle.ToString());
+                Plugin.Log.LogInfo("BackSpin: " + backSpin.ToString());
+                Plugin.Log.LogInfo("SideSpin: " + sideSpin.ToString());
+                Plugin.Log.LogInfo("TotalSpin: " + totalSpin.ToString());
+                Plugin.Log.LogInfo("SpinAxisDeg: " + spinAxisDegrees.ToString());
+
+                GSPShotData gspshotData = new()
                 {
-                    Speed = (float)num,
-                    SpinAxis = (float)num7,
-                    TotalSpin = (float)num6,
-                    BackSpin = (float)num4,
-                    SideSpin = (float)num5,
-                    HLA = (float)num3,
-                    VLA = (float)num2
+                    DeviceID = "OpenApi",
+                    Units = "Yards",
+                    APIversion = "1",
+                    BallData = new GSPBallData
+                    {
+                        Speed = (float)ballSpeedMPH,
+                        SpinAxis = (float)spinAxisDegrees,
+                        TotalSpin = (float)totalSpin,
+                        BackSpin = (float)backSpin,
+                        SideSpin = (float)sideSpin,
+                        HLA = (float)horizontalLaunchAngle,
+                        VLA = (float)verticalLaunchAngle
+                    },
+                    ShotDataOptions = new GSPShotDataOptions
+                    {
+                        ContainsBallData = true,
+                        ContainsClubData = false,
+                        LaunchMonitorIsReady = false,
+                        LaunchMonitorBallDetected = false,
+                        IsHeartBeat = false
+                    }
                 };
-                gspshotData.ShotDataOptions = new GSPShotDataOptions
-                {
-                    ContainsBallData = true,
-                    ContainsClubData = false,
-                    LaunchMonitorIsReady = false,
-                    LaunchMonitorBallDetected = false,
-                    IsHeartBeat = false
-                };
-                Plugin.Log.LogInfo("Sending BallData to GSPro: " + JsonConvert.SerializeObject(gspshotData));
+
+                Plugin.Log.LogInfo("Sending Shot Data to GSPro: " + JsonConvert.SerializeObject(gspshotData));
                 Plugin.api.SendToGSP(JsonConvert.SerializeObject(gspshotData));
             }
         }

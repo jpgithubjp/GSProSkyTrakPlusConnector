@@ -1,4 +1,4 @@
-﻿namespace SkytakOpenAPI
+﻿namespace SkytrakOpenAPI
 {
     internal class GSPResponse
     {

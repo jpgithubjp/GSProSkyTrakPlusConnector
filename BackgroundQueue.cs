@@ -2,12 +2,12 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace SkytakOpenAPI
+namespace SkytrakOpenAPI
 {
     public class BackgroundQueue
     {
         private Task previousTask = Task.FromResult<bool>(true);
-        private object key = new object();
+        private object key = new();
 
         public Task QueueTask(Action action)
         {

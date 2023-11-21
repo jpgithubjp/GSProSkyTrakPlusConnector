@@ -1,16 +1,16 @@
-﻿using System;
+﻿using BepInEx.Logging;
+using Newtonsoft.Json;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using BepInEx.Logging;
-using Newtonsoft.Json;
 
-namespace SkytakOpenAPI
+namespace SkytrakOpenAPI
 {
     public class GSPApi
     {
-        private BackgroundQueue _GSPSendQueue = new BackgroundQueue();
+        //private BackgroundQueue _GSPSendQueue = new();
         private const int _OpenAPIPort = 921;
         //[Nullable(2)]
         private Socket _GSPSocket;
@@ -21,7 +21,7 @@ namespace SkytakOpenAPI
 
         public void ConnectToGSP()
         {
-            IPEndPoint remoteEP = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 921);
+            IPEndPoint remoteEP = new(IPAddress.Parse("127.0.0.1"), _OpenAPIPort);
             this._GSPSocket = new Socket(IPAddress.Parse("127.0.0.1").AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             while (!GSPApi.connected)
             {

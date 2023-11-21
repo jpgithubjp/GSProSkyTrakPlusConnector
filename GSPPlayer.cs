@@ -1,4 +1,4 @@
-﻿namespace SkytakOpenAPI
+﻿namespace SkytrakOpenAPI
 {
     public class GSPPlayer
     {
